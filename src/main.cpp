@@ -29,13 +29,13 @@ int uc20State = 0;
 
 String str = "";
 
-int send_ATcommand(String ATcommand, char *response_correct, unsigned int time);
-void power_on();
-void config_uc20();
-void Send_thingspeak(float *pressure, float *tempBMP, float *altitude, float *tempDHT, float *humedad);
 
 void SensorRead(float *pressure, float *tempBMP, float *altitude, float *tempDHT, float *humedad);
 void DisplayPresTemp(float *pressure, float *tempBMP, float *altitude, float *tempDHT, float *humedad);
+void power_on();
+void config_uc20();
+void Send_thingspeak(float *pressure, float *tempBMP, float *altitude, float *tempDHT, float *humedad);
+int send_ATcommand(String ATcommand, char *response_correct, unsigned int time);
 
 void setup()
 {
@@ -74,15 +74,9 @@ void setup()
       u8g.setFontRefHeightExtendedText();
       u8g.setDefaultForegroundColor();
       u8g.setFontPosTop();
-      u8g.drawStr(0, a, "HIBOUZ IoT");
+      u8g.drawStr(0, a, "HIBOUZ IoT"); //PARA CAMBIAR EL LOGO DE INICIO https://javl.github.io/image2cpp/
     } while (u8g.nextPage());
   }
-
-  Serial.println();
-  Serial.println("<<<<<<<< Iniciando Estación Meteorológica >>>>>>>>>>>");
-  Serial.println();
-  Serial.println("Configurando UC20 por favor espere 5 segundos.");
-  delay(5000);
 
   if (!bmp.begin())
   {
@@ -104,6 +98,7 @@ void setup()
     {
     }
   }
+
 }
 
 void loop()
@@ -115,8 +110,11 @@ void loop()
   }
 
   SensorRead(&pressure, &tempBMP, &altitude, &tempDHT, &humedad);
+  delay(1000);
   DisplayPresTemp(&pressure, &tempBMP, &altitude, &tempDHT, &humedad);
+  delay(1000);
   Send_thingspeak(&pressure, &tempBMP, &altitude, &tempDHT, &humedad);
+  
   delay(10000);
 }
 
@@ -163,14 +161,13 @@ int send_ATcommand(String ATcommand, char *response_correct, unsigned int time)
 {
   int x = 0;
   bool correct = 0;
-  char response_ATommand[100];
+  char response_ATommand[250];
   unsigned long past;
 
   memset(response_ATommand, '\0', 100);
   delay(5);
 
-  while (UC20.available() > 0)
-    UC20.read();
+  while (UC20.available() > 0) UC20.read();
 
   UC20.println(ATcommand);
   x = 0;
@@ -180,7 +177,6 @@ int send_ATcommand(String ATcommand, char *response_correct, unsigned int time)
   {
     if (UC20.available() != 0)
     {
-      delay(5);
       response_ATommand[x] = UC20.read();
       x++;
       if (strstr(response_ATommand, response_correct) != NULL)
@@ -192,74 +188,93 @@ int send_ATcommand(String ATcommand, char *response_correct, unsigned int time)
   Serial.println(response_ATommand);
   return correct;
 }
+
 void power_on()
 {
   digitalWrite(pwrKey, HIGH);
   delay(200);
   digitalWrite(pwrKey, LOW);
-  Serial.println("Shield UC20 Encendido");
+  Serial.println("Encendiendo Modulo UC20");
+  Serial.println("Esperar 10 segundos...");
+  Serial.println("");
+  delay(10000);
   config_uc20();
-  delay(2000);
 }
 void config_uc20()
 {
-  while (send_ATcommand("AT", "OK", 1000) == 0)
+  Serial.println("Configurando Modulo UC20");
+  Serial.println("");
+  delay(1000);
+  while (send_ATcommand("AT", "OK", 2000) == 0)
   {
   }
-  while (send_ATcommand("ATE1", "OK", 1000) == 0)
-  {
-  }
+  delay(1000);
   while (send_ATcommand("AT+CMEE=2", "OK", 2000) == 0)
   {
   }
+  delay(1000);
   while (send_ATcommand("AT+CPIN?", "+CPIN: READY", 1000) == 0)
   {
   }
+  delay(1000);
   while (send_ATcommand("AT+CREG?", "+CREG: 0,1", 3000) == 0)
   {
   }
+  delay(1000);
   while (send_ATcommand("AT+CGREG?", "+CGREG: 0,1", 3000) == 0)
   {
   }
+  delay(1000);
   while (send_ATcommand("AT+COPS?", "OK", 3000) == 0)
   {
   }
+  delay(1000);
   while (send_ATcommand("AT+CGATT=1", "OK", 3000) == 0)
   {
   }
-  while (send_ATcommand("AT+QICSGP=1,1,\"internet.movistar.com.co\",\"movistar\",\"movistar\",1", "OK", 2000) == 0)
+  delay(1000);
+  while (send_ATcommand("AT+QHTTPCFG=\"contextid\",1", "OK", 2000) == 0)
   {
   }
-  while (send_ATcommand("AT+QICSGP=1,1,\"contextid\",1", "OK", 2000) == 0)
+  delay(1000);
+  while (send_ATcommand("AT+QICSGP=1,1,\"internet.movistar.com.co\",\"\",\"\",1", "OK", 3000) == 0)
   {
   }
-  while (send_ATcommand("AT+QIACT?", "OK", 1000) == 0)
-  {
-  }
-  
-  Serial.println();
   delay(1000);
 }
-void Send_thingspeak(float *pressure, float *tempBMP, float *altitude, float *tempDHT, float *humedad)
+
+void Send_thingspeak(float *pressure, float *tempBMP, float *altitude, float *tempDHT, float *humedad)     
 {
-  while (send_ATcommand("AT+QIACT=1", "OK", 5000) == 0)
-  {
-  }
 
-  while (send_ATcommand("AT+QHTTPURL=121,80", "CONNECT", 2000) == 0)
+  if (send_ATcommand("AT+QIACT?\r", "+QIACT: 1,1,1", 5000) == 1)
   {
-  }
 
-  str = "http://api.thingspeak.com/update?api_key=9ZSV4H9Z4G0EZ17K&field1=" + String(*pressure) + "&field2=" + String(*altitude) + "&field3=" + String(*tempBMP) + "&field4=" + String(*humedad) + "&field5=" + String(*tempDHT);
+    str = "http://api.thingspeak.com/update?api_key=JBGZYNFP7L2Z6U6V&field1=" + String(*pressure, 1) + "&field2=" + String(*altitude, 1) + "&field3=" + String(*tempBMP, 1) + "&field4=" + String(*humedad, 1)+"\n";
 
-  send_ATcommand( str, "OK", 5000);
-  
-  while (send_ATcommand("AT+QHTTPGET=80", "OK", 2000) == 0)
+    unsigned int lenurl = str.length()+1;
+    String tamURL = (String)lenurl;
+    delay(1000);
+
+    if (send_ATcommand("AT+QHTTPURL=" + tamURL + ",80", "CONNECT", 2000) == 1)
+    {
+      UC20.println(str);
+      Serial.println(str);
+    }
+    delay(3000);
+
+    if (send_ATcommand("AT+QHTTPGET=80", "OK", 5000) == 1)
+    {
+      Serial.println("Trama Enviada!!!");
+    }
+
+    delay(3000);
+
+  } else if (send_ATcommand("AT+QIACT?\r", "ERROR", 5000) == 1)
   {
-  }
-
-  while (send_ATcommand("AT+QIDEACT=1", "OK", 5000) == 0)
+    send_ATcommand("AT+QIDEACT=1", "OK", 5000);
+  } else if (send_ATcommand("AT+QIACT?\r", "OK", 5000) == 1)
   {
+    send_ATcommand("AT+QIACT=1", "OK", 5000);
   }
 
   delay(5000);
