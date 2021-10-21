@@ -29,7 +29,6 @@ int uc20State = 0;
 
 String str = "";
 
-
 void SensorRead(float *pressure, float *tempBMP, float *altitude, float *tempDHT, float *humedad);
 void DisplayPresTemp(float *pressure, float *tempBMP, float *altitude, float *tempDHT, float *humedad);
 void power_on();
